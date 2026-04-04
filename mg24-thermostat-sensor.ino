@@ -7,7 +7,6 @@
 
 #define COUNT_OF_READS 3
 
-//bool readAHT(float &tempC, float &humidityPct, uint32_t readCount = 1);
 bool readAHT(float tempReading[], float humidityReading[]);
 void printReadings(float tempReading[], float humidityReading[]);
 void getAndPrintTemp();
@@ -24,13 +23,12 @@ void setup() {
 
   if (LowPower.wokeUpFromDeepSleep()) {
     cycle = LowPower.deepSleepMemoryRead(0);
+    cycle++;
   } else {
-    cycle = 0;
+    cycle = 1;
   }
-  
-  cycle++;
+
   LowPower.deepSleepMemoryWrite(0, cycle);
-  //delay(2000); // Prevents failure to wake from deep sleep
 
   startMillis = millis();
 
@@ -42,14 +40,10 @@ void setup() {
   }
   
   Serial.printf("Running after waiting %ums...\n", millis() - serialStart);
-
-  //delay(3000);
 }
 
 void loop() {
-  //for (uint32_t i = 0; i < 10; i++) {
   getAndPrintTemp();
-  //}
 
   Serial.println("Complete, going to sleep");
   Serial.printf("Execution time: %ums\n", millis() - startMillis);
@@ -68,33 +62,22 @@ void setPinsStartup() {
 }
 
 void setPinsShutdown() {
-  //pinMode(LED_BUILTIN, INPUT);
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
   digitalWrite(SENSOR_POWER, LOW);
-  //pinMode(SENSOR_POWER, INPUT);
 }
 
 void getAndPrintTemp() {
   float tempReading[COUNT_OF_READS];
   float humidityReading[COUNT_OF_READS];
 
-  //float tempC, humidityPct;
-
-  //if (readAHT(tempC, humidityPct)) {
   if (readAHT(tempReading, humidityReading)) {
     printReadings(tempReading, humidityReading);
-    //Serial.printf("Temp: %fC\n", tempC);
-    //Serial.printf("Temp: %fF\n", (tempC * 9 / 5) + 32);
-    //Serial.printf("Humidity: %f%%\n", humidityPct);
-    //delay(2000);
   } else {
     Serial.println("AHT read failed");
-    //delay(3000);
   }
 
 }
 
-//bool readAHT(float &tempC, float &humidityPct, uint32_t readCount) {
 bool readAHT(float tempReading[], float humidityReading[]) {
   digitalWrite(SENSOR_POWER, HIGH);
   delay(200);
@@ -123,9 +106,6 @@ bool readAHT(float tempReading[], float humidityReading[]) {
 
   Wire.end();
   digitalWrite(SENSOR_POWER, LOW);
-
-  //tempC = temp.temperature;
-  //humidityPct = humidity.relative_humidity;
 
   return true;
 }

@@ -1,15 +1,13 @@
 #include <Wire.h>
-#include <Adafruit_AHTX0.h>
 #include <ArduinoLowPower.h>
 #include "src/app_config.h"
+#include "src/aht_manager.cpp"
 
-bool readAHT(float tempReading[], float humidityReading[]);
-void printReadings(float tempReading[], float humidityReading[]);
-void getAndPrintTemp();
 void setPinsStartup();
 void setPinsShutdown();
 
-Adafruit_AHTX0 aht;
+AhtManager<AppConfig::COUNT_OF_READS> ahtManager(AppConfig::SENSOR_POWER);
+
 unsigned long startMillis;
 
 uint32_t cycle;
@@ -29,6 +27,7 @@ void setup() {
   startMillis = millis();
 
   setPinsStartup();
+  ahtManager.begin();
   Serial.begin(115200);
   unsigned long serialStart = millis();
   while (!Serial && millis() - serialStart < 2000) {
@@ -39,77 +38,21 @@ void setup() {
 }
 
 void loop() {
-  getAndPrintTemp();
+  ahtManager.update();
+  setPinsShutdown();
 
-  Serial.println("Complete, going to sleep");
   Serial.printf("Execution time: %ums\n", millis() - startMillis);
   Serial.printf("Cycle: %lu\n", cycle);
-    setPinsShutdown();
   Serial.flush();
-  delay(50);
 
   LowPower.deepSleep((int)AppConfig::DEEP_SLEEP_MS);
 }
 
 void setPinsStartup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(AppConfig::SENSOR_POWER, OUTPUT);
-  digitalWrite(AppConfig::SENSOR_POWER, LOW);
 }
 
 void setPinsShutdown() {
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
-  digitalWrite(AppConfig::SENSOR_POWER, LOW);
-}
-
-void getAndPrintTemp() {
-  float tempReading[AppConfig::COUNT_OF_READS];
-  float humidityReading[AppConfig::COUNT_OF_READS];
-
-  if (readAHT(tempReading, humidityReading)) {
-    printReadings(tempReading, humidityReading);
-  } else {
-    Serial.println("AHT read failed");
-  }
-
-}
-
-bool readAHT(float tempReading[], float humidityReading[]) {
-  digitalWrite(AppConfig::SENSOR_POWER, HIGH);
-  delay(200);
-
-  Wire.begin();
-  delay(20);
-
-  if (!aht.begin()) {
-    Wire.end();
-    digitalWrite(AppConfig::SENSOR_POWER, LOW);
-
-    return false;
-  }
-
-  delay(50);
-
-  sensors_event_t humidity, temp;
-  for (uint32_t i = 0; i < AppConfig::COUNT_OF_READS; i++) {
-    
-    aht.getEvent(&humidity, &temp);
-
-    tempReading[i] = temp.temperature;
-    humidityReading[i] = humidity.relative_humidity;
-    delay(50);
-  }
-
-  Wire.end();
-  digitalWrite(AppConfig::SENSOR_POWER, LOW);
-
-  return true;
-}
-
-void printReadings(float tempReading[], float humidityReading[]) {
-  for (uint32_t i = 0; i < AppConfig::COUNT_OF_READS; i++) {
-    Serial.printf("Temperature: %fC\n", tempReading[i]);
-    Serial.printf("Temperature: %fF\n", (tempReading[i] * 9 / 5) + 32);
-    Serial.printf("Humidity: %f%%\n", humidityReading[i]);
-  }
+  //digitalWrite(AppConfig::SENSOR_POWER, LOW);
 }

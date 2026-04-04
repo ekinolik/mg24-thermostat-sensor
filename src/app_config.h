@@ -7,4 +7,4 @@ namespace AppConfig {
     static constexpr uint32_t COUNT_OF_READS = 3;
 
     static constexpr pin_size_t SENSOR_POWER = D2;
-}
+};

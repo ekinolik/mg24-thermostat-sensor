@@ -27,8 +27,8 @@ void setup() {
   startMillis = millis();
 
   setPinsStartup();
-  ahtManager.begin();
   Serial.begin(115200);
+  ahtManager.begin();
   unsigned long serialStart = millis();
   while (!Serial && millis() - serialStart < 2000) {
     delay(10);
@@ -54,5 +54,4 @@ void setPinsStartup() {
 
 void setPinsShutdown() {
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
-  //digitalWrite(AppConfig::SENSOR_POWER, LOW);
 }

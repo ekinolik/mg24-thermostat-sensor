@@ -1,8 +1,6 @@
 #include "aht_manager.h"
 #include "app_config.h"
 
-//Adafruit_AHTX0 aht;
-
 template <size_t READCOUNT>
 AhtManager<READCOUNT>::AhtManager(pin_size_t powerPin) :
     m_powerPin(powerPin) {}
@@ -27,7 +25,7 @@ template <size_t READCOUNT>
 void AhtManager<READCOUNT>::clearTempAndHumidityReading() {
     for (uint8_t i = 0; i < countOfReads; i++) {
         tempReading[i]     = -50; // Temp shown on error
-        humidityReading[i] = 0; // Humidity shown on error
+        humidityReading[i] = 0;  // Humidity shown on error
     }
 }
 

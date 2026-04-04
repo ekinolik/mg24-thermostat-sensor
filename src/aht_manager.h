@@ -3,7 +3,6 @@
 #include "app_config.h"
 #include <Arduino.h>
 #include <Adafruit_AHTX0.h>
-//#include <Adafruit_AHTX0.h>
 
 template <size_t READCOUNT=3>
 class AhtManager {

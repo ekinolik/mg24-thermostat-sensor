@@ -1,11 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_AHTX0.h>
 #include <ArduinoLowPower.h>
-
-#define SENSOR_POWER D2
-#define DEEP_SLEEP_MS 7000UL // 7 seconds
-
-#define COUNT_OF_READS 3
+#include "src/app_config.h"
 
 bool readAHT(float tempReading[], float humidityReading[]);
 void printReadings(float tempReading[], float humidityReading[]);
@@ -52,23 +48,23 @@ void loop() {
   Serial.flush();
   delay(50);
 
-  LowPower.deepSleep(DEEP_SLEEP_MS);
+  LowPower.deepSleep((int)AppConfig::DEEP_SLEEP_MS);
 }
 
 void setPinsStartup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(SENSOR_POWER, OUTPUT);
-  digitalWrite(SENSOR_POWER, LOW);
+  pinMode(AppConfig::SENSOR_POWER, OUTPUT);
+  digitalWrite(AppConfig::SENSOR_POWER, LOW);
 }
 
 void setPinsShutdown() {
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
-  digitalWrite(SENSOR_POWER, LOW);
+  digitalWrite(AppConfig::SENSOR_POWER, LOW);
 }
 
 void getAndPrintTemp() {
-  float tempReading[COUNT_OF_READS];
-  float humidityReading[COUNT_OF_READS];
+  float tempReading[AppConfig::COUNT_OF_READS];
+  float humidityReading[AppConfig::COUNT_OF_READS];
 
   if (readAHT(tempReading, humidityReading)) {
     printReadings(tempReading, humidityReading);
@@ -79,7 +75,7 @@ void getAndPrintTemp() {
 }
 
 bool readAHT(float tempReading[], float humidityReading[]) {
-  digitalWrite(SENSOR_POWER, HIGH);
+  digitalWrite(AppConfig::SENSOR_POWER, HIGH);
   delay(200);
 
   Wire.begin();
@@ -87,7 +83,7 @@ bool readAHT(float tempReading[], float humidityReading[]) {
 
   if (!aht.begin()) {
     Wire.end();
-    digitalWrite(SENSOR_POWER, LOW);
+    digitalWrite(AppConfig::SENSOR_POWER, LOW);
 
     return false;
   }
@@ -95,7 +91,7 @@ bool readAHT(float tempReading[], float humidityReading[]) {
   delay(50);
 
   sensors_event_t humidity, temp;
-  for (uint32_t i = 0; i < COUNT_OF_READS; i++) {
+  for (uint32_t i = 0; i < AppConfig::COUNT_OF_READS; i++) {
     
     aht.getEvent(&humidity, &temp);
 
@@ -105,13 +101,13 @@ bool readAHT(float tempReading[], float humidityReading[]) {
   }
 
   Wire.end();
-  digitalWrite(SENSOR_POWER, LOW);
+  digitalWrite(AppConfig::SENSOR_POWER, LOW);
 
   return true;
 }
 
 void printReadings(float tempReading[], float humidityReading[]) {
-  for (uint32_t i = 0; i < COUNT_OF_READS; i++) {
+  for (uint32_t i = 0; i < AppConfig::COUNT_OF_READS; i++) {
     Serial.printf("Temperature: %fC\n", tempReading[i]);
     Serial.printf("Temperature: %fF\n", (tempReading[i] * 9 / 5) + 32);
     Serial.printf("Humidity: %f%%\n", humidityReading[i]);

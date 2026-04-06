@@ -10,15 +10,31 @@ public:
     Adafruit_AHTX0 aht;
     AhtManager(pin_size_t powerPin);
 
+    float errorTemp = -50;
+    float errorHumidity = 0;
+
+    struct Stats {
+        float sum;
+        int64_t count;
+        float average;
+    };
+
+    struct AHTMeasurement {
+        float temperature;
+        float humidity;
+        bool isValid = false;
+    };
+
     static constexpr uint32_t countOfReads = READCOUNT;
 
     float tempReading[READCOUNT];
     float humidityReading[READCOUNT];
 
-    void begin();
-    void update();
+    Stats tempStats;
+    Stats humidityStats;
 
-    void getAndPrintTemp();
+    void begin(uint32_t count);
+    void update();
 
 private:
     pin_size_t m_powerPin;
@@ -26,10 +42,18 @@ private:
     sensors_event_t m_temp;
     sensors_event_t m_humidity;
 
-    void clearTempAndHumidityReading();
+    bool m_successfulReading = false;
+
+    uint32_t readCount;
+
+    void clearState();
     bool readAHT();
     bool sensorStart();
     void sensorEnd();
+
+    void getAHTEventStats();
+    AHTMeasurement getAHTEvent();
+    void updateTempStats(AHTMeasurement measurement);
 
     void printReadings();
 

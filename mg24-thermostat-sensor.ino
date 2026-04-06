@@ -13,39 +13,34 @@ unsigned long startMillis;
 uint32_t cycle;
 
 void setup() {
-  LowPower.sleep(2000);
-
-  if (LowPower.wokeUpFromDeepSleep()) {
-    cycle = LowPower.deepSleepMemoryRead(0);
-    cycle++;
-  } else {
-    cycle = 1;
-  }
-
-  LowPower.deepSleepMemoryWrite(0, cycle);
-
+  cycle = 0;
   startMillis = millis();
 
   setPinsStartup();
   Serial.begin(115200);
-  ahtManager.begin();
+  ahtManager.begin(AppConfig::COUNT_OF_READS);
   unsigned long serialStart = millis();
   while (!Serial && millis() - serialStart < 2000) {
-    delay(10);
+    LowPower.sleep(10);
   }
   
   Serial.printf("Running after waiting %ums...\n", millis() - serialStart);
 }
 
 void loop() {
+  uint64_t cycleStart = millis();
+  cycle++;
+  digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
   ahtManager.update();
-  setPinsShutdown();
+  //setPinsShutdown();
 
-  Serial.printf("Execution time: %ums\n", millis() - startMillis);
+  Serial.printf("Execution time: %ums\n", millis() - cycleStart);
   Serial.printf("Cycle: %lu\n", cycle);
   Serial.flush();
+  digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
 
-  LowPower.deepSleep((int)AppConfig::DEEP_SLEEP_MS);
+  //LowPower.deepSleep((int)AppConfig::DEEP_SLEEP_MS);
+  LowPower.sleep((int)AppConfig::DEEP_SLEEP_MS);
 }
 
 void setPinsStartup() {

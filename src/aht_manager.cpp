@@ -1,13 +1,15 @@
 #include "aht_manager.h"
 #include "app_config.h"
+#include <ArduinoLowPower.h>
 
 template <size_t READCOUNT>
 AhtManager<READCOUNT>::AhtManager(pin_size_t powerPin) :
     m_powerPin(powerPin) {}
 
 template <size_t READCOUNT>
-void AhtManager<READCOUNT>::begin() {
-    clearTempAndHumidityReading();
+void AhtManager<READCOUNT>::begin(uint32_t count) {
+    readCount = count;
+    clearState();
 
     pinMode(m_powerPin, OUTPUT);
     digitalWrite(m_powerPin, LOW);
@@ -15,49 +17,81 @@ void AhtManager<READCOUNT>::begin() {
 
 template <size_t READCOUNT>
 void AhtManager<READCOUNT>::update() {
-    getAndPrintTemp();
+    clearState();
+    getAHTEventStats();
+    printReadings();
 
     Serial.println("Complete, going to sleep");
     Serial.flush();
 }
 
 template <size_t READCOUNT>
-void AhtManager<READCOUNT>::clearTempAndHumidityReading() {
-    for (uint8_t i = 0; i < countOfReads; i++) {
-        tempReading[i]     = -50; // Temp shown on error
-        humidityReading[i] = 0;  // Humidity shown on error
+void AhtManager<READCOUNT>::getAHTEventStats() {
+    if (!sensorStart()) {
+        return;
+    }
+
+    AHTMeasurement measurement ;
+    for (uint32_t i = 0; i < readCount; i++) {
+        measurement = getAHTEvent();
+        if (!measurement.isValid) {
+            continue;
+        }
+
+        updateTempStats(measurement);
+        m_successfulReading = true;
+    }
+
+    sensorEnd();
+
+    return;
+}
+
+template <size_t READCOUNT>
+typename AhtManager<READCOUNT>::AHTMeasurement AhtManager<READCOUNT>::getAHTEvent() {
+    if (digitalRead(m_powerPin) != HIGH) {
+        return AHTMeasurement{};
+    }
+
+    aht.getEvent(&m_humidity, &m_temp);
+
+    AHTMeasurement measurement;
+    measurement.temperature = m_temp.temperature;
+    measurement.humidity = m_humidity.relative_humidity;
+    measurement.isValid = true;
+
+    return measurement;
+}
+
+template <size_t READCOUNT>
+void AhtManager<READCOUNT>::updateTempStats(AHTMeasurement measurement) {
+    if (measurement.temperature != errorTemp) {
+        tempStats.count++;
+        tempStats.sum += measurement.temperature;
+        tempStats.average = tempStats.sum / tempStats.count;
+    }
+
+    if (measurement.humidity != errorTemp) {
+        humidityStats.count++;
+        humidityStats.sum += measurement.humidity;
+        humidityStats.average = humidityStats.sum / humidityStats.count;
     }
 }
 
 template <size_t READCOUNT>
-bool AhtManager<READCOUNT>::readAHT() {
-  if (!sensorStart()) {
-    return false;
-  }
-
-  delay(50); // is this needed?
-
-  for (uint32_t i = 0; i < countOfReads; i++) {
-    
-    aht.getEvent(&m_humidity, &m_temp);
-
-    tempReading[i] = m_temp.temperature;
-    humidityReading[i] = m_humidity.relative_humidity;
-    delay(10); // Not actually needed
-  }
-
-  sensorEnd();
-  
-  return true;
+void AhtManager<READCOUNT>::clearState() {
+    tempStats = Stats{};
+    humidityStats = Stats{};
+    m_successfulReading = false;
 }
 
 template <size_t READCOUNT>
 bool AhtManager<READCOUNT>::sensorStart() {
   digitalWrite(m_powerPin, HIGH);
-  delay(200); // Give time for AHT device to start
+  LowPower.sleep(200); // Give time for AHT device to start
 
   Wire.begin();
-  delay(20);
+  LowPower.sleep(20);
 
   if (!aht.begin()) {
     Wire.end();
@@ -76,21 +110,10 @@ void AhtManager<READCOUNT>::sensorEnd() {
 }
 
 template <size_t READCOUNT>
-void AhtManager<READCOUNT>::getAndPrintTemp() {
-  if (readAHT()) {
-    printReadings();
-  } else {
-    Serial.println("AHT read failed");
-  }
-}
-
-template <size_t READCOUNT>
 void AhtManager<READCOUNT>::printReadings() {
-  for (uint32_t i = 0; i < countOfReads; i++) {
-    Serial.printf("Temperature: %fC\n", tempReading[i]);
-    Serial.printf("Temperature: %fF\n", convertCtoF(tempReading[i]));
-    Serial.printf("Humidity: %f%%\n", humidityReading[i]);
-  }
+    Serial.printf("Temperature: %fC\n", tempStats.average);
+    Serial.printf("Temperature: %fF\n", convertCtoF(tempStats.average));
+    Serial.printf("Humidity: %f%%\n", humidityStats.average);
 }
 
 template <size_t READCOUNT>

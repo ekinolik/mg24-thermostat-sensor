@@ -6,6 +6,7 @@ AhtManager::AhtManager(pin_size_t powerPin) :
     m_powerPin(powerPin) {}
 
 void AhtManager::begin(uint32_t count) {
+    // Serial may not be available yet
     readCount = count;
     clearState();
 
@@ -16,6 +17,7 @@ void AhtManager::begin(uint32_t count) {
 void AhtManager::update() {
     clearState();
     getAHTEventStats();
+    finalizeMeasurement();
     printReadings();
 
     Serial.println("Complete, going to sleep");
@@ -72,6 +74,16 @@ void AhtManager::updateTempStats(AHTMeasurement measurement) {
     }
 }
 
+void AhtManager::finalizeMeasurement() {
+    if (!m_successfulReading || tempStats.count == 0 || humidityStats.count == 0) {
+        latestMeasurement = AHTMeasurement{};
+    }
+
+    latestMeasurement.temperature = tempStats.average;
+    latestMeasurement.humidity    = humidityStats.average;
+    latestMeasurement.isValid     = true;
+}
+
 void AhtManager::clearState() {
     tempStats = Stats{};
     humidityStats = Stats{};
@@ -101,11 +113,32 @@ void AhtManager::sensorEnd() {
 }
 
 void AhtManager::printReadings() {
-    Serial.printf("Temperature: %fC\n", tempStats.average);
-    Serial.printf("Temperature: %fF\n", convertCtoF(tempStats.average));
-    Serial.printf("Humidity: %f%%\n", humidityStats.average);
+    if (!latestMeasurement.isValid) {
+        Serial.println("Temperature: invalid");
+        Serial.println("Humidity: invalid");
+    }
+    
+    Serial.printf("Temperature: %fC\n", latestMeasurement.temperature);
+    Serial.printf("Temperature: %fF\n", convertCtoF(latestMeasurement.temperature));
+    Serial.printf("Humidity: %f%%\n", latestMeasurement.humidity);
 }
 
 float AhtManager::convertCtoF(float C) {
     return (C * 9 / 5) + 32;
+}
+
+bool AhtManager::hasValidReading() const {
+    return latestMeasurement.isValid;
+}
+
+float AhtManager::getTemperatureC() const {
+    return latestMeasurement.temperature;
+}
+
+float AhtManager::getHumidityPct() const {
+    return latestMeasurement.humidity;
+}
+
+AhtManager::AHTMeasurement AhtManager::getLatestMeasurement() const {
+    return latestMeasurement;
 }

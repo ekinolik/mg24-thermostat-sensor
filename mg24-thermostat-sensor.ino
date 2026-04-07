@@ -5,15 +5,13 @@
 #include "src/aht_manager.h"
 
 void setupBLE();
+void advertiseMeasurement();
+void buildBeaconPayload(uint8_t* payload, size_t& payloadLen);
 void setPinsStartup();
 
 AhtManager ahtManager(AppConfig::SENSOR_POWER);
 
 uint32_t cycle;
-
-BLEService envService("181A");
-BLEShortCharacteristic temperatureCharacteristic("2A6E", BLERead | BLENotify);
-BLEUnsignedShortCharacteristic humidityCharacteristic("2A6F", BLERead | BLENotify);
 
 void setup() {
   cycle = 0;
@@ -37,11 +35,8 @@ void loop() {
   cycle++;
   digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
 
-  // Keep BLE stack serviced
-  BLE.poll();
-
   ahtManager.update();
-  updateBLECharacteristics();
+  advertiseMeasurement();
 
   Serial.printf("Execution time: %ums\n", millis() - cycleStart);
   Serial.printf("Cycle: %lu\n", cycle);
@@ -51,7 +46,7 @@ void loop() {
 
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
 
-  LowPower.sleep(10); //(int)AppConfig::DEEP_SLEEP_MS);
+  LowPower.sleep((int)AppConfig::DEEP_SLEEP_MS);
 }
 
 void setPinsStartup() {
@@ -66,42 +61,74 @@ void setupBLE() {
     }
   }
 
-  BLE.setDeviceName("MG24 Thermostat Sensor");
-  BLE.setLocalName("MG24 Themostat Sensor");
-  BLE.setAdvertisedService(envService);
+  BLE.setLocalName(AppConfig::BLE_LOCAL_NAME);
+  BLE.setAdvertisingInterval(AppConfig::ADV_INTERVAL_UNITS);
 
-  envService.addCharacteristic(temperatureCharacteristic);
-  envService.addCharacteristic(humidityCharacteristic);
-
-  BLE.addService(envService);
-
-  temperatureCharacteristic.writeValue((int16_t)0);
-  humidityCharacteristic.writeValue((int16_t)0);
-
-  BLE.advertise();
-
-  Serial.println("BLE Advertising Started");
+  Serial.println("BLE beacon mode initiated");
 }
 
-void updateBLECharacteristics() {
+void advertiseMeasurement() {
   if (!ahtManager.hasValidReading()) {
-    Serial.println("Skipping BLE Update: no valid reading");
-
+    Serial.println("Skipping BLE Beacon: no valid reading");
     return;
   }
 
+  uint8_t payload[8];
+  size_t payloadLen = 0;
+  buildBeaconPayload(payload, payloadLen);
+
+  BLE.stopAdvertise();
+  BLE.setManufacturerData(payload, payloadLen);
+
+  if (!BLE.advertise()) {
+    Serial.println("BLE.advertise() failed");
+    return;
+  }
+
+  Serial.print("Advertising beacon payload: ");
+  for (size_t i = 0; i < payloadLen; i++) {
+    Serial.printf("%02X", payload[i]);
+    if (i + 1 < payloadLen) Serial.print(" ");
+  }
+  Serial.println();
+
+  uint32_t advStart = millis();
+  while (millis() - advStart < AppConfig::ADVERTISE_WINDOW_MS) {
+    BLE.poll();
+    LowPower.sleep(25);
+  }
+
+  BLE.stopAdvertise();
+  Serial.println("Stopped Advertising");
+}
+
+void buildBeaconPayload(uint8_t* payload, size_t& payloadLen) {
   const float tempC = ahtManager.getTemperatureC();
   const float humidityPct = ahtManager.getHumidityPct();
 
-  // BLE ESS Temperatuer/humidity are commonly sent in 0.01 units
-  const int16_t tempBle = (int16_t)lroundf(tempC * 100.0f);
-  Serial.printf("---- ROUNDED: %d\n", tempBle);
-  const uint16_t humidityBle = (uint16_t)lroundf(humidityPct * 100.0f);
+  const int16_t tempCenti = (uint16_t)lroundf(tempC * 100.0f);
+  const uint16_t humidityCenti = (uint16_t)lroundf(humidityPct * 100.0f);
 
-  temperatureCharacteristic.writeValue(tempBle);
-  humidityCharacteristic.writeValue(humidityBle);
+  uint8_t flags = 0x00;
+  if (ahtManager.hasValidReading()) {
+    flags |= 0x01;
+  }
 
-  Serial.printf("BLE Updated: temp=%d (0.01C), humidity=%u (0.01%%)\n",
-    tempBle, humidityBle);
+  // Manufacturer data payload
+  payload[0] = (uint8_t)(AppConfig::COMPANY_ID & 0xFF);
+  payload[1] = (uint8_t)((AppConfig::COMPANY_ID >> 8) & 0xFF);
+  payload[2] = 0x01; //payload version
+  payload[3] = flags;
 
+  // little-endian int16 temperature
+  payload[4] = (uint8_t)(tempCenti & 0xFF);
+  payload[5] = (uint8_t)((tempCenti >> 8) & 0xFF);
+
+  // little-endian uint16 humidity
+  payload[6] = (uint8_t)(humidityCenti & 0xFF);
+  payload[7] = (uint16_t)((humidityCenti >> 8) & 0xFF);
+
+  payloadLen = 8;
+
+  Serial.printf("Beacon values: temp=%.2fC humidity%.2f%%\n", tempC, humidityPct);
 }

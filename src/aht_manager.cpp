@@ -80,10 +80,10 @@ void AhtManager::clearState() {
 
 bool AhtManager::sensorStart() {
   digitalWrite(m_powerPin, HIGH);
-  LowPower.sleep(200); // Give time for AHT device to start
+  LowPower.sleep(10); // Give time for AHT device to start
 
   Wire.begin();
-  LowPower.sleep(20);
+  LowPower.sleep(5);
 
   if (!aht.begin()) {
     Wire.end();

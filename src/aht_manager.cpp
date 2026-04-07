@@ -65,7 +65,7 @@ void AhtManager::updateTempStats(AHTMeasurement measurement) {
         tempStats.average = tempStats.sum / tempStats.count;
     }
 
-    if (measurement.humidity != errorTemp) {
+    if (measurement.humidity != errorHumidity) {
         humidityStats.count++;
         humidityStats.sum += measurement.humidity;
         humidityStats.average = humidityStats.sum / humidityStats.count;

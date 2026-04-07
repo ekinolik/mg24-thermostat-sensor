@@ -8,13 +8,10 @@ void setPinsShutdown();
 
 AhtManager ahtManager(AppConfig::SENSOR_POWER);
 
-unsigned long startMillis;
-
 uint32_t cycle;
 
 void setup() {
   cycle = 0;
-  startMillis = millis();
 
   setPinsStartup();
   Serial.begin(115200);
@@ -43,8 +40,4 @@ void loop() {
 
 void setPinsStartup() {
   pinMode(LED_BUILTIN, OUTPUT);
-}
-
-void setPinsShutdown() {
-  digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
 }

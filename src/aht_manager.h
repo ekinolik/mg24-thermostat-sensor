@@ -41,7 +41,6 @@ private:
     uint32_t readCount;
 
     void clearState();
-    bool readAHT();
     bool sensorStart();
     void sensorEnd();
 

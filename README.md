@@ -1,19 +1,21 @@
 # MG24 thermostat sensor
 
-Firmware for a **Silicon Labs EFR32MG24**–class Arduino board that reads **temperature and relative humidity** from an **AHT20/AHT21-class** sensor (via the Adafruit AHTX0 driver), prints samples over **Serial**, then returns to **deep sleep** to save power. A **wake cycle counter** is stored in deep-sleep retention memory so it survives across sleep.
+Firmware for a **Silicon Labs EFR32MG24**–class Arduino board that reads **temperature and relative humidity** from an **AHT20/AHT21-class** sensor (via the Adafruit AHTX0 driver), **averages** several samples per cycle, prints results over **Serial**, and sleeps between cycles with **`LowPower.sleep()`** to reduce duty cycle.
 
 ## Behavior
 
-1. On boot, the sketch waits **2 seconds** (`LowPower.sleep(2000)`), then increments a persisted cycle counter (starts at 1 on cold boot). **Why:** see *Boot delay after deep sleep / EM4* below.
-2. Initializes the built-in LED, Serial at **115200 baud**, and the AHT manager.
-3. Each loop iteration: powers the sensor, runs I²C, takes several consecutive readings, prints °C, °F, and humidity, drives the LED inactive, logs execution time and cycle number, flushes Serial, then **deep sleeps** for a configurable interval.
-4. After deep sleep the MCU resets; `setup()` runs again and the cycle continues.
+1. **`setup()`** — Resets a **cycle counter** (RAM only), configures the built-in LED, starts **Serial** at **115200 baud**, and calls `ahtManager.begin(AppConfig::COUNT_OF_READS)`. While waiting for USB Serial (up to ~2 s), the wait loop uses **`LowPower.sleep(10)`** instead of a busy delay.
+2. **`loop()`** — Increments the cycle counter, turns the **LED on**, runs a measurement (`ahtManager.update()`), prints **execution time for that iteration** and the **cycle** number, turns the **LED off**, then sleeps for **`AppConfig::DEEP_SLEEP_MS`** using **`LowPower.sleep()`**.  
+   - **`LowPower.deepSleep()`** is **commented out** in the sketch; with the current sleep mode the MCU typically **does not** fully reset between iterations, so the cycle counter **does not** use retention RAM.
+3. **Sensor path** — Power to the AHT is **only asserted during a read**: the power pin goes high, short **`LowPower.sleep()`** delays allow the part and I²C to settle, **`Wire`** is started, the sensor is initialized, then **`readCount`** events are read. Each valid sample updates **running sums and averages** for temperature and humidity. **`Wire`** is stopped and the power pin is driven low when done.
 
-Sensor power is **only asserted during a read**: the power pin is driven high, `Wire` is started, the AHT is initialized, samples are taken, then `Wire` is stopped and the power pin is driven low.
+### Averaging and errors
 
-### Boot delay after deep sleep / EM4
+`AhtManager` aggregates successful `getEvent()` samples into **`tempStats`** and **`humidityStats`** (sum, count, average). Samples that fail validation are skipped. If **`aht.begin()`** fails after power-up, no readings are collected for that cycle (averages stay at default/zero).
 
-On this platform, waking from **`LowPower.deepSleep()`** (energy mode **EM4**) can leave the system not fully ready when `setup()` first runs. If the firmware touches **Serial**, **I²C**, or other peripherals too soon, the device can fail to recover—effectively **bricked** until a reset or reflash. The **2 s sleep at the very start of `setup()`** is intentional: it gives clocks, buses, and the rest of the runtime time to finish coming up before any device code runs. That delay is separate from the optional wait for USB Serial in the IDE.
+### Deep sleep / EM4 (optional)
+
+The sketch currently uses **`LowPower.sleep()`**, not EM4 **deep sleep**. If you **re-enable** `LowPower.deepSleep()` for maximum savings, waking from deep sleep can leave the system not fully ready when `setup()` runs; touching **Serial** or **I²C** too early has been observed to leave some boards stuck until reset. A **short `LowPower.sleep()` at the very start of `setup()`** (not present in the tree today) is a common mitigation—evaluate on your hardware.
 
 ## Hardware
 
@@ -37,7 +39,7 @@ Wire your AHT module to the board’s I²C pins and to the same ground. Power th
 |---------|------|
 | [Adafruit AHTX0](https://github.com/adafruit/Adafruit_AHTX0) | AHT temperature / humidity |
 | **Adafruit BusIO** | Dependency of Adafruit AHTX0 (install if the IDE prompts) |
-| **ArduinoLowPower** | Deep sleep and retention RAM helpers (provided by / aligned with the Silicon Labs core) |
+| **ArduinoLowPower** | `LowPower.sleep()` (and optional deep sleep APIs if you enable them) |
 | **Wire** | I²C (built into the core) |
 
 ## Configuration
@@ -46,24 +48,24 @@ Edit `src/app_config.h`:
 
 | Constant | Meaning |
 |----------|---------|
-| `DEEP_SLEEP_MS` | Milliseconds in `LowPower.deepSleep()` between wake cycles (default **7000**). |
-| `COUNT_OF_READS` | Number of back-to-back samples per wake (default **3**). |
+| `DEEP_SLEEP_MS` | Milliseconds for **`LowPower.sleep()`** between loop iterations (default **7000**). |
+| `COUNT_OF_READS` | Samples per measurement before averaging (passed to `ahtManager.begin()`, default **3**). |
 | `SENSOR_POWER` | GPIO that switches sensor power (default **`D2`**). |
 
 ## Project layout
 
 | Path | Purpose |
 |------|---------|
-| `mg24-thermostat-sensor.ino` | Sleep/cycle orchestration, Serial, LED |
-| `src/app_config.h` | Timing, pin, and sample-count constants |
-| `src/aht_manager.h` | `AhtManager` template declaration |
-| `src/aht_manager.cpp` | Template definitions (included from the sketch so the compiler sees the instantiation) |
+| `mg24-thermostat-sensor.ino` | Cycle counter, Serial, LED, sleep between iterations |
+| `src/app_config.h` | Sleep interval, sample count, sensor power pin |
+| `src/aht_manager.h` | `AhtManager` class (sensor power, I²C, averaging) |
+| `src/aht_manager.cpp` | `AhtManager` implementation |
 
 ## Serial output
 
-- Wait / startup line, then per sample: temperature (°C and °F) and humidity (%).
-- `"Complete, going to sleep"` before sleep.
-- Execution time since start of `setup()` and the current **cycle** number.
-- On I²C or sensor init failure: `"AHT read failed"`.
+- Startup: `Running after waiting …` (USB Serial wait time).
+- After each measurement: **average** temperature (°C and °F) and **average** humidity (%).
+- `"Complete, going to sleep"` before the sketch returns to the wait/sleep between cycles.
+- **Execution time** for the **current loop iteration** (measurement + printing), and the **cycle** number (monotonic while powered).
 
-Open the serial monitor at **115200** baud after flashing; on some boards USB enumeration can take up to a couple of seconds (the sketch waits briefly for Serial).
+Open the serial monitor at **115200** baud after flashing; the sketch waits up to ~2 s for USB Serial before continuing.

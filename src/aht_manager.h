@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <Adafruit_AHTX0.h>
 
-template <size_t READCOUNT=3>
 class AhtManager {
 public:
     Adafruit_AHTX0 aht;
@@ -24,11 +23,6 @@ public:
         float humidity;
         bool isValid = false;
     };
-
-    static constexpr uint32_t countOfReads = READCOUNT;
-
-    float tempReading[READCOUNT];
-    float humidityReading[READCOUNT];
 
     Stats tempStats;
     Stats humidityStats;

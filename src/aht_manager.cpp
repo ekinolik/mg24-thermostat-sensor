@@ -2,12 +2,10 @@
 #include "app_config.h"
 #include <ArduinoLowPower.h>
 
-template <size_t READCOUNT>
-AhtManager<READCOUNT>::AhtManager(pin_size_t powerPin) :
+AhtManager::AhtManager(pin_size_t powerPin) :
     m_powerPin(powerPin) {}
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::begin(uint32_t count) {
+void AhtManager::begin(uint32_t count) {
     readCount = count;
     clearState();
 
@@ -15,8 +13,7 @@ void AhtManager<READCOUNT>::begin(uint32_t count) {
     digitalWrite(m_powerPin, LOW);
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::update() {
+void AhtManager::update() {
     clearState();
     getAHTEventStats();
     printReadings();
@@ -25,8 +22,7 @@ void AhtManager<READCOUNT>::update() {
     Serial.flush();
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::getAHTEventStats() {
+void AhtManager::getAHTEventStats() {
     if (!sensorStart()) {
         return;
     }
@@ -47,8 +43,7 @@ void AhtManager<READCOUNT>::getAHTEventStats() {
     return;
 }
 
-template <size_t READCOUNT>
-typename AhtManager<READCOUNT>::AHTMeasurement AhtManager<READCOUNT>::getAHTEvent() {
+typename AhtManager::AHTMeasurement AhtManager::getAHTEvent() {
     if (digitalRead(m_powerPin) != HIGH) {
         return AHTMeasurement{};
     }
@@ -63,8 +58,7 @@ typename AhtManager<READCOUNT>::AHTMeasurement AhtManager<READCOUNT>::getAHTEven
     return measurement;
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::updateTempStats(AHTMeasurement measurement) {
+void AhtManager::updateTempStats(AHTMeasurement measurement) {
     if (measurement.temperature != errorTemp) {
         tempStats.count++;
         tempStats.sum += measurement.temperature;
@@ -78,15 +72,13 @@ void AhtManager<READCOUNT>::updateTempStats(AHTMeasurement measurement) {
     }
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::clearState() {
+void AhtManager::clearState() {
     tempStats = Stats{};
     humidityStats = Stats{};
     m_successfulReading = false;
 }
 
-template <size_t READCOUNT>
-bool AhtManager<READCOUNT>::sensorStart() {
+bool AhtManager::sensorStart() {
   digitalWrite(m_powerPin, HIGH);
   LowPower.sleep(200); // Give time for AHT device to start
 
@@ -103,20 +95,17 @@ bool AhtManager<READCOUNT>::sensorStart() {
   return true;
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::sensorEnd() {
+void AhtManager::sensorEnd() {
     Wire.end();
     digitalWrite(m_powerPin, LOW);
 }
 
-template <size_t READCOUNT>
-void AhtManager<READCOUNT>::printReadings() {
+void AhtManager::printReadings() {
     Serial.printf("Temperature: %fC\n", tempStats.average);
     Serial.printf("Temperature: %fF\n", convertCtoF(tempStats.average));
     Serial.printf("Humidity: %f%%\n", humidityStats.average);
 }
 
-template <size_t READCOUNT>
-float AhtManager<READCOUNT>::convertCtoF(float C) {
+float AhtManager::convertCtoF(float C) {
     return (C * 9 / 5) + 32;
 }

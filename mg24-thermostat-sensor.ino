@@ -1,12 +1,12 @@
 #include <Wire.h>
 #include <ArduinoLowPower.h>
 #include "src/app_config.h"
-#include "src/aht_manager.cpp"
+#include "src/aht_manager.h"
 
 void setPinsStartup();
 void setPinsShutdown();
 
-AhtManager<AppConfig::COUNT_OF_READS> ahtManager(AppConfig::SENSOR_POWER);
+AhtManager ahtManager(AppConfig::SENSOR_POWER);
 
 unsigned long startMillis;
 
@@ -32,14 +32,12 @@ void loop() {
   cycle++;
   digitalWrite(LED_BUILTIN, LED_BUILTIN_ACTIVE);
   ahtManager.update();
-  //setPinsShutdown();
 
   Serial.printf("Execution time: %ums\n", millis() - cycleStart);
   Serial.printf("Cycle: %lu\n", cycle);
   Serial.flush();
   digitalWrite(LED_BUILTIN, LED_BUILTIN_INACTIVE);
 
-  //LowPower.deepSleep((int)AppConfig::DEEP_SLEEP_MS);
   LowPower.sleep((int)AppConfig::DEEP_SLEEP_MS);
 }
 
